@@ -23,9 +23,9 @@ enum class LEDPin {
 
 // Sound level thresholds (in percentage)
 enum class Threshold {
-    SILENT = 25,
-    QUIET = 50,
-    MODERATE = 75,
+    SILENT = 10,
+    QUIET = 30,
+    MODERATE = 60,
     LOUD = 99
 };
 
@@ -40,7 +40,7 @@ enum class SoundCategory {
 
 class SoundMonitor {
 private:
-    static constexpr int AVERAGE_WINDOW = 7;
+    static constexpr int AVERAGE_WINDOW = 10;
     int readings[AVERAGE_WINDOW] = {0};
     int readIndex = 0;
     int total = 0;
