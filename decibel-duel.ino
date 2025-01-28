@@ -1,10 +1,17 @@
+#include <Wire.h>              // Include the Wire library for I2C
+#include <LiquidCrystal_I2C.h> // Include the LiquidCrystal_I2C library
+
+// Initialize the I2C LCD with the I2C address, number of columns, and rows
+// Common I2C addresses for LCD are 0x27 or 0x3F
+LiquidCrystal_I2C lcd(0x23, 16, 2);  // Change the address if necessary
+
 // Configuration constants
 namespace Config {
     constexpr int MICROPHONE_PIN = A0;
     constexpr int SAMPLE_RATE_MS = 50;  // Increased sampling rate
     constexpr int SERIAL_BAUD = 9600;
 
-    constexpr int BASELINE_VALUE = 590;
+    constexpr int BASELINE_VALUE = 585;
     constexpr int MAX_ADJUSTED_VALUE = 300;
     constexpr int ANALOG_READ_MAX = 1023;
 
@@ -156,10 +163,23 @@ private:
         Serial.println(getCategoryString(category));
     }
 
+void updateLCD(SoundCategory category) {
+    lcd.setCursor(0, 0);               // Set cursor to the first column of the first row
+    lcd.print("                ");     // Clear the line by printing spaces
+    lcd.setCursor(0, 0);               // Reset cursor to the start of the line
+    lcd.print(getCategoryString(category));  // Print the current category
+}
+
 public:
     void begin() {
         Serial.begin(Config::SERIAL_BAUD);
         initializeLEDs();
+
+        lcd.init();           // Initialize the LCD
+        lcd.backlight();      // Turn on the backlight
+        lcd.print("Sound Monitor");  // Print a welcome message
+        delay(1000);
+        lcd.clear();  // Clear the LCD
 
         for (int i = 0; i < AVERAGE_WINDOW; i++) {
             addReading(getMaxSample());
@@ -187,6 +207,7 @@ public:
 
         SoundCategory newCategory = categorizeSoundLevel(soundLevel);
         updateLEDs(newCategory);
+        updateLCD(newCategory);  // Update the LCD with the current category
 
         printDebugInfo(sensorValue, soundLevel, newCategory);
     }
