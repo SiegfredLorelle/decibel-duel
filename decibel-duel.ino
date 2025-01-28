@@ -152,7 +152,7 @@ private:
         }
     }
 
-    void printDebugInfo(int rawValue, int soundLevel, SoundCategory category) {
+    void printDebugInfo(int rawValue, int soundLevel, SoundCategory category, int score) {
         Serial.print(F("Raw: "));
         Serial.print(rawValue);
         Serial.print(F(" | Level: "));
@@ -160,15 +160,32 @@ private:
         Serial.print(F("% | Peak: "));
         Serial.print(peakValue);
         Serial.print(F("% | Category: "));
-        Serial.println(getCategoryString(category));
+        Serial.print(getCategoryString(category));
+        Serial.print(F(" | Score: "));
+        Serial.println(score);
     }
 
-void updateLCD(SoundCategory category) {
-    lcd.setCursor(0, 0);               // Set cursor to the first column of the first row
-    lcd.print("                ");     // Clear the line by printing spaces
-    lcd.setCursor(0, 0);               // Reset cursor to the start of the line
-    lcd.print(getCategoryString(category));  // Print the current category
-}
+    void updateLCD(SoundCategory category, int score) {
+        lcd.setCursor(0, 0);               // Set cursor to the first column of the first row
+        lcd.print("                ");     // Clear the line by printing spaces
+        lcd.setCursor(0, 0);               // Reset cursor to the start of the line
+        lcd.print(getCategoryString(category));  // Print the current category
+
+        lcd.setCursor(0, 1);               // Set cursor to the first column of the second row
+        lcd.print("Score: ");
+        lcd.print(score);                  // Print the score
+    }
+
+    int getCategoryValue(SoundCategory category) {
+        switch (category) {
+            case SoundCategory::Silent:   return 0;
+            case SoundCategory::Quiet:    return 1;
+            case SoundCategory::Moderate: return 2;
+            case SoundCategory::Loud:     return 3;
+            case SoundCategory::VeryLoud: return 4;
+            default:                      return 0;
+        }
+    }
 
 public:
     void begin() {
@@ -200,16 +217,50 @@ public:
         }
     }
 
-    void update() {
+    void update(SoundCategory botCategory, int& score) {
         int sensorValue = getAverageReading();
         int soundLevel = calculateSoundLevel(sensorValue);
         updatePeakValue(soundLevel);
 
-        SoundCategory newCategory = categorizeSoundLevel(soundLevel);
-        updateLEDs(newCategory);
-        updateLCD(newCategory);  // Update the LCD with the current category
+        SoundCategory userCategory = categorizeSoundLevel(soundLevel);
+        updateLEDs(userCategory);
 
-        printDebugInfo(sensorValue, soundLevel, newCategory);
+        // Calculate the difference between user and bot categories
+        int userCategoryValue = getCategoryValue(userCategory);
+        int botCategoryValue = getCategoryValue(botCategory);
+        int categoryDifference = abs(userCategoryValue - botCategoryValue);
+
+        // Calculate the score increment based on the category difference
+        int scoreIncrement = 0;
+        switch (categoryDifference) {
+            case 0:  // Same category
+                scoreIncrement = 5;
+                break;
+            case 1:  // One category apart
+                scoreIncrement = 3;
+                break;
+            case 2:  // Two categories apart
+                scoreIncrement = 2;
+                break;
+            case 3:  // Three categories apart
+                scoreIncrement = 1;
+                break;
+            case 4:  // Four categories apart
+                scoreIncrement = 1;
+                break;
+            default:
+                scoreIncrement = 0;
+                break;
+        }
+
+        // Update the score
+        score += scoreIncrement;
+
+        // Update the LCD with the current category and score
+        updateLCD(userCategory, score);
+
+        // Print debug info
+        printDebugInfo(sensorValue, soundLevel, userCategory, score);  // Pass the score here
     }
 };
 
@@ -262,18 +313,22 @@ public:
         changeInterval = random(2000, 3000);  // Random interval between 2 and 10 seconds
     }
 
-    void update() {
+    SoundCategory update() {
         unsigned long currentTime = millis();
         if (currentTime - lastChangeTime >= changeInterval) {
             SoundCategory newCategory = getRandomCategory();
             updateBotLEDs(newCategory);
             lastChangeTime = currentTime;
             changeInterval = random(2000, 3000);  // Set a new random interval
+            currentBotCategory = newCategory;  // Update the bot's current category
         }
+        return currentBotCategory;  // Return the bot's current category
     }
 };
 
 BotLEDController botLEDController;
+
+int score = 0;
 
 void setup() {
     soundMonitor.begin();
@@ -281,7 +336,7 @@ void setup() {
 }
 
 void loop() {
-    soundMonitor.update();
-    botLEDController.update();
+    SoundCategory botCategory = botLEDController.update();  // Get the bot's current category
+    soundMonitor.update(botCategory, score);  // Pass the bot's category to the sound monitor
     delay(Config::SAMPLE_RATE_MS);
 }
