@@ -165,11 +165,12 @@ private:
         Serial.println(score);
     }
 
-    void updateLCD(SoundCategory category, int score) {
+    void updateLCD(unsigned long remainingTime, int score) {
         lcd.setCursor(0, 0);               // Set cursor to the first column of the first row
         lcd.print("                ");     // Clear the line by printing spaces
         lcd.setCursor(0, 0);               // Reset cursor to the start of the line
-        lcd.print(getCategoryString(category));  // Print the current category
+        lcd.print("Time: ");
+        lcd.print(remainingTime / 1000);   // Print the remaining time in seconds
 
         lcd.setCursor(0, 1);               // Set cursor to the first column of the second row
         lcd.print("Score: ");
@@ -217,7 +218,7 @@ public:
         }
     }
 
-    void update(SoundCategory botCategory, int& score) {
+    void update(SoundCategory botCategory, int& score, unsigned long remainingTime) {
         int sensorValue = getAverageReading();
         int soundLevel = calculateSoundLevel(sensorValue);
         updatePeakValue(soundLevel);
@@ -256,8 +257,8 @@ public:
         // Update the score
         score += scoreIncrement;
 
-        // Update the LCD with the current category and score
-        updateLCD(userCategory, score);
+        // Update the LCD with the remaining time and score
+        updateLCD(remainingTime, score);
 
         // Print debug info
         printDebugInfo(sensorValue, soundLevel, userCategory, score);  // Pass the score here
@@ -329,14 +330,36 @@ public:
 BotLEDController botLEDController;
 
 int score = 0;
+unsigned long gameStartTime = 0;
+const unsigned long GAME_DURATION = 30000;  // 30 seconds in milliseconds
 
 void setup() {
     soundMonitor.begin();
     botLEDController.begin();
+    gameStartTime = millis();  // Record the start time of the game
 }
 
 void loop() {
-    SoundCategory botCategory = botLEDController.update();  // Get the bot's current category
-    soundMonitor.update(botCategory, score);  // Pass the bot's category to the sound monitor
-    delay(Config::SAMPLE_RATE_MS);
+    unsigned long currentTime = millis();
+    unsigned long elapsedTime = currentTime - gameStartTime;
+
+    if (elapsedTime < GAME_DURATION) {
+        // Game is still running
+        unsigned long remainingTime = GAME_DURATION - elapsedTime;
+        SoundCategory botCategory = botLEDController.update();  // Get the bot's current category
+        soundMonitor.update(botCategory, score, remainingTime);  // Pass the bot's category and remaining time to the sound monitor
+        delay(Config::SAMPLE_RATE_MS);
+    } else {
+        // Game over, display "Game Over" on the LCD
+        lcd.setCursor(0, 0);
+        lcd.print("Game Over");
+        lcd.setCursor(0, 1);
+        lcd.print("Score: ");
+        lcd.print(score);
+        while (true);  // Stop the game loop
+    }
 }
+
+// ADD button to restart game
+// Turn off all LEDS when game is over
+// Refactor/ separate into different files
