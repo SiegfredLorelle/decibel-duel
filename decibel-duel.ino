@@ -13,12 +13,20 @@ namespace Config {
 }
 
 // LED pins for each category
-enum class LEDPin {
-    SILENT = 2,     // Green
-    QUIET = 3,      // Blue
-    MODERATE = 4,   // Yellow
-    LOUD = 5,       // Orange
-    VERY_LOUD = 6   // Red
+enum class UserLEDPin {
+    SILENT = 7,
+    QUIET = 8,
+    MODERATE = 9, 
+    LOUD = 10,
+    VERY_LOUD = 11
+};
+
+enum class BotLEDPin {
+    SILENT = 2,
+    QUIET = 3,
+    MODERATE = 4,
+    LOUD = 5,
+    VERY_LOUD = 6
 };
 
 // Sound level thresholds (in percentage)
@@ -104,11 +112,11 @@ private:
 
     int getCategoryLEDPin(SoundCategory category) {
         switch (category) {
-            case SoundCategory::Silent:   return static_cast<int>(LEDPin::SILENT);
-            case SoundCategory::Quiet:    return static_cast<int>(LEDPin::QUIET);
-            case SoundCategory::Moderate: return static_cast<int>(LEDPin::MODERATE);
-            case SoundCategory::Loud:     return static_cast<int>(LEDPin::LOUD);
-            case SoundCategory::VeryLoud: return static_cast<int>(LEDPin::VERY_LOUD);
+            case SoundCategory::Silent:   return static_cast<int>(UserLEDPin::SILENT);
+            case SoundCategory::Quiet:    return static_cast<int>(UserLEDPin::QUIET);
+            case SoundCategory::Moderate: return static_cast<int>(UserLEDPin::MODERATE);
+            case SoundCategory::Loud:     return static_cast<int>(UserLEDPin::LOUD);
+            case SoundCategory::VeryLoud: return static_cast<int>(UserLEDPin::VERY_LOUD);
             default:                      return -1;
         }
     }
@@ -126,11 +134,11 @@ private:
     void updateLEDs(SoundCategory newCategory) {
         if (newCategory != currentCategory) {
             // Turn off all LEDs
-            for (int i = static_cast<int>(LEDPin::SILENT); i <= static_cast<int>(LEDPin::VERY_LOUD); i++) {
+            for (int i = static_cast<int>(UserLEDPin::SILENT); i <= static_cast<int>(UserLEDPin::VERY_LOUD); i++) {
                 digitalWrite(i, LOW);
             }
             // Turn on LEDs up to the new category
-            for (int i = static_cast<int>(LEDPin::SILENT); i <= getCategoryLEDPin(newCategory); i++) {
+            for (int i = static_cast<int>(UserLEDPin::SILENT); i <= getCategoryLEDPin(newCategory); i++) {
                 digitalWrite(i, HIGH);
             }
             currentCategory = newCategory;
@@ -162,7 +170,11 @@ public:
     }
 
     void initializeLEDs() {
-        for (int i = static_cast<int>(LEDPin::SILENT); i <= static_cast<int>(LEDPin::VERY_LOUD); i++) {
+        for (int i = static_cast<int>(UserLEDPin::SILENT); i <= static_cast<int>(UserLEDPin::VERY_LOUD); i++) {
+            pinMode(i, OUTPUT);
+            digitalWrite(i, LOW);
+        }
+        for (int i = static_cast<int>(BotLEDPin::SILENT); i <= static_cast<int>(BotLEDPin::VERY_LOUD); i++) {
             pinMode(i, OUTPUT);
             digitalWrite(i, LOW);
         }
@@ -182,11 +194,73 @@ public:
 
 SoundMonitor soundMonitor;
 
+class BotLEDController {
+private:
+    SoundCategory currentBotCategory = SoundCategory::Silent;
+    unsigned long lastChangeTime = 0;
+    unsigned long changeInterval = 0;
+
+    int getCategoryLEDPin(SoundCategory category) {
+        switch (category) {
+            case SoundCategory::Silent:   return static_cast<int>(BotLEDPin::SILENT);
+            case SoundCategory::Quiet:    return static_cast<int>(BotLEDPin::QUIET);
+            case SoundCategory::Moderate: return static_cast<int>(BotLEDPin::MODERATE);
+            case SoundCategory::Loud:     return static_cast<int>(BotLEDPin::LOUD);
+            case SoundCategory::VeryLoud: return static_cast<int>(BotLEDPin::VERY_LOUD);
+            default:                      return -1;
+        }
+    }
+
+    void updateBotLEDs(SoundCategory newCategory) {
+        if (newCategory != currentBotCategory) {
+            // Turn off all Bot LEDs
+            for (int i = static_cast<int>(BotLEDPin::SILENT); i <= static_cast<int>(BotLEDPin::VERY_LOUD); i++) {
+                digitalWrite(i, LOW);
+            }
+            // Turn on Bot LEDs up to the new category
+            for (int i = static_cast<int>(BotLEDPin::SILENT); i <= getCategoryLEDPin(newCategory); i++) {
+                digitalWrite(i, HIGH);
+            }
+            currentBotCategory = newCategory;
+        }
+    }
+
+    SoundCategory getRandomCategory() {
+        int randomValue = random(0, 5);  // Random value between 0 and 4
+        return static_cast<SoundCategory>(randomValue);
+    }
+
+public:
+    void begin() {
+        for (int i = static_cast<int>(BotLEDPin::SILENT); i <= static_cast<int>(BotLEDPin::VERY_LOUD); i++) {
+            pinMode(i, OUTPUT);
+            digitalWrite(i, LOW);
+        }
+        randomSeed(analogRead(0));  // Seed the random number generator
+        lastChangeTime = millis();
+        changeInterval = random(2000, 3000);  // Random interval between 2 and 10 seconds
+    }
+
+    void update() {
+        unsigned long currentTime = millis();
+        if (currentTime - lastChangeTime >= changeInterval) {
+            SoundCategory newCategory = getRandomCategory();
+            updateBotLEDs(newCategory);
+            lastChangeTime = currentTime;
+            changeInterval = random(2000, 3000);  // Set a new random interval
+        }
+    }
+};
+
+BotLEDController botLEDController;
+
 void setup() {
     soundMonitor.begin();
+    botLEDController.begin();
 }
 
 void loop() {
     soundMonitor.update();
+    botLEDController.update();
     delay(Config::SAMPLE_RATE_MS);
 }
